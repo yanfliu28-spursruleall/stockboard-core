@@ -17,7 +17,7 @@ for _s in (sys.stdout, sys.stderr):
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 import config
-from core import market, news as newsmod, alerts_brief, holdings as hmod, crypto_gate, demo, valuation, narrative, quant
+from core import market, news as newsmod, alerts_brief, holdings as hmod, crypto_gate, demo, valuation, narrative, quant, universe, macro
 
 CACHE, DIST = ROOT / "cache", ROOT / "dist"
 CACHE.mkdir(exist_ok=True); DIST.mkdir(exist_ok=True)
@@ -47,10 +47,15 @@ def main():
         a.skip_13f = hp.exists() and time.time() - hp.stat().st_mtime < 7 * 86400
         print(f"      13F 缓存{'新鲜，复用' if a.skip_13f else '已过期或不存在，重新抓取（约 6 分钟）'}")
 
+    wl_all = config.WATCHLIST
+    if not a.demo and config.EXTRA_TICKERS:
+        print(f"      覆盖名单：手工 {len(config.WATCHLIST)} + 自动纳入 {len(config.EXTRA_TICKERS)} ..."); wl_all = universe.expand(config.WATCHLIST, config.EXTRA_TICKERS)
+        newsmod.set_universe(wl_all)
+
     if a.demo:
         hist, raw, stat, hold = demo.demo_hist(), demo.demo_news(), {"演示": 15}, demo.demo_holdings()
     else:
-        tick = [c["t"] for c in config.WATCHLIST] + list(set(config.SECTOR_ETFS.values())) + [config.BENCHMARK]
+        tick = [c["t"] for c in wl_all] + list(set(config.SECTOR_ETFS.values())) + [config.BENCHMARK]
         print(f"[1/4] 行情 {len(tick)} 个标的 ..."); hist = market.fetch_many(tick)
         print("[2/4] 新闻 ..."); raw, stat = newsmod.fetch_all_news()
         if a.skip_13f:
@@ -67,9 +72,13 @@ def main():
     if a.demo:
         wl = config.WATCHLIST
     else:
-        print("      估值：SEC 财报 -> Graham/DCF/Lynch ..."); wl = valuation.apply(config.WATCHLIST, hist)
+        print("      估值：SEC 财报 -> Graham/DCF/Lynch ..."); wl = valuation.apply(wl_all, hist)
         print("      自动估值", sum(1 for w in wl if w["val_src"].startswith("自动")), "家，回退目标价/手工", sum(1 for w in wl if not w["val_src"].startswith("自动")), "家")
     board = market.build_board(hist, wl)
+    for r in board:       # 信号卫生：低置信度的估值不应被当作“买点/卖点”信号，降级为“存疑”（保留模型原结论供参考）
+        r["zone_raw"] = r["zone"]
+        if r.get("val_conf") == "低" and r["zone"] in ("买点区", "沉默区", "高估区", "卖点上方"):
+            r["zone"] = "存疑"
     sectors = market.sector_prosperity(hist)
     news = newsmod.process(raw)
     prev = _load("zones.json", {})
@@ -80,11 +89,22 @@ def main():
     new_alerts = sum(1 for i in cur_ids if i not in prev_alerts)
     (CACHE / "alert_ids.json").write_text(json.dumps(cur_ids, ensure_ascii=False), "utf-8")
     narrative.enrich(board, news, hold["funds"], alerts)
+    cal = []
+    for r in board:
+        ne = r.get("next_earn")
+        if ne and ne["days"] <= 30:
+            cal.append({"t": r["t"], "name": r["name"], "date": ne["date"], "days": ne["days"], "zone": r["zone"],
+                        "eps_q": (r.get("ev") or {}).get("q_eps"), "rev_q": (r.get("ev") or {}).get("q_rev"), "q_end": (r.get("ev") or {}).get("q_end")})
+    cal.sort(key=lambda x: (x["days"], x["t"]))
+    macro_data = None
+    if not a.demo:
+        try: macro_data = macro.build()
+        except Exception as e: print("      宏观面板失败:", type(e).__name__, str(e)[:80])
     briefs = [alerts_brief.build_brief(k, board, sectors, news, alerts) for k in ("pre", "post")]
 
     data = {"meta": {"generated": datetime.now().strftime("%Y-%m-%d %H:%M"), "demo": a.demo, "news_stat": stat, "new_alerts": new_alerts,
                                                 "health": {"auto": sum(1 for r in board if r.get("val_src","").startswith("自动")), "low_conf": sum(1 for r in board if r.get("val_conf") == "低"), "total": len(board)}},
-            "board": board, "sectors": sectors, "news": news[:400], "alerts": alerts, "holdings": hold, "briefs": briefs}
+            "board": board, "calendar": cal, "macro": macro_data, "sectors": sectors, "news": news[:400], "alerts": alerts, "holdings": hold, "briefs": briefs}
     if not a.demo and not a.skip_quant:
         print("      量化因子研究 ..."); data["quant"] = quant.run(refresh=a.refresh_quant)
         print(f"      量化：{len(data['quant']['factors'])} 个因子，GP 评估 {data['quant']['meta']['n_tried']} 个候选")

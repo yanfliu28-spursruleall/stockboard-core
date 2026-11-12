@@ -54,6 +54,30 @@ def zone_of(price: float, buy: float, fair: float, sell: float) -> str:
     return "沉默区"
 
 
+def _risk(h: dict, spy: dict | None) -> dict:
+    """近 1 年年化波动率 / 最大回撤 / 对标普500的 Beta（按日期对齐）。"""
+    c, ts = h["close"], h["ts"]
+    rets = [c[i] / c[i - 1] - 1 for i in range(1, len(c))]
+    mu = sum(rets) / len(rets)
+    vol = (sum((x - mu) ** 2 for x in rets) / (len(rets) - 1)) ** 0.5 * 252 ** 0.5 if len(rets) > 2 else None
+    peak, mdd = c[0], 0.0
+    for x in c:
+        peak = max(peak, x); mdd = min(mdd, x / peak - 1)
+    beta = None
+    if spy:
+        sm = dict(zip(spy["ts"], spy["close"]))
+        pairs = [(sm[ts[i]] / sm[ts[i - 1]] - 1, c[i] / c[i - 1] - 1) for i in range(1, len(c)) if ts[i] in sm and ts[i - 1] in sm]
+        if len(pairs) > 60:
+            ms, mt = sum(p[0] for p in pairs) / len(pairs), sum(p[1] for p in pairs) / len(pairs)
+            var = sum((p[0] - ms) ** 2 for p in pairs)
+            beta = round(sum((p[0] - ms) * (p[1] - mt) for p in pairs) / var, 2) if var else None
+    return {"vol": round(vol, 3) if vol else None, "mdd": round(mdd, 3), "beta1y": beta}
+
+
+def _rel(px: float, ref) -> float | None:
+    return round(px / ref - 1, 4) if ref else None
+
+
 def build_board(hist: dict[str, dict | None], watchlist: list[dict] | None = None) -> list[dict]:
     rows = []
     for c in (watchlist or config.WATCHLIST):
@@ -71,11 +95,10 @@ def build_board(hist: dict[str, dict | None], watchlist: list[dict] | None = Non
             r1m=_ret(close, 21), r3m=_ret(close, 63), r6m=_ret(close, 126),
             hi52=round(hi, 2), lo52=round(lo, 2),
             from_hi=round(px / hi - 1, 4),
-            to_buy=round(px / c["buy"] - 1, 4),
-            to_fair=round(px / c["fair"] - 1, 4),
-            to_sell=round(px / c["sell"] - 1, 4),
-            zone=zone_of(px, c["buy"], c["fair"], c["sell"]),
+            to_buy=_rel(px, c.get("buy")), to_fair=_rel(px, c.get("fair")), to_sell=_rel(px, c.get("sell")),
+            zone=zone_of(px, c["buy"], c["fair"], c["sell"]) if all(c.get(k) for k in ("buy", "fair", "sell")) else "无估值",
             spark=[round(x, 2) for x in close[-60:]],
+            **_risk(h, hist.get(config.BENCHMARK)),
         )
         rows.append(row)
     return rows

@@ -18,3 +18,5 @@ tools/quant_ui.js
 templates/*.bak
 templates/*.pre_mobile
 tools/test_hook.py
+templates/app.html.*
+tools/fix_*.py

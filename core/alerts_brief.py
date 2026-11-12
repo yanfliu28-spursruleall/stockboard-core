@@ -6,6 +6,15 @@ from zoneinfo import ZoneInfo
 ET = ZoneInfo("America/New_York")
 
 
+def _why(news: list[dict], t: str):
+    """该标的 48 小时内重要性最高的一条情报，用来解释“为什么异动”。"""
+    best = None
+    for n in news:
+        if t in n["tickers"] and not n["excluded"] and n["age_h"] <= 48 and not n.get("junk") and (best is None or n["imp"] > best["imp"]):
+            best = n
+    return best
+
+
 def build_alerts(board: list[dict], news: list[dict], prev_zones: dict[str, str] | None = None) -> list[dict]:
     """预警类型：区间切换 / 大幅异动 / 逼近52周高低 / S-A 级新闻命中自选"""
     prev_zones = prev_zones or {}
@@ -14,13 +23,15 @@ def build_alerts(board: list[dict], news: list[dict], prev_zones: dict[str, str]
         if r.get("price") is None:
             continue
         t = r["t"]
-        if prev_zones.get(t) and prev_zones[t] != r["zone"]:
+        if prev_zones.get(t) and prev_zones[t] != r["zone"] and "存疑" not in (prev_zones[t], r["zone"]):
             out.append({"t": t, "type": "区间切换", "level": "高", "msg": f'{prev_zones[t]} → {r["zone"]}'})
         if r["zone"] == "买点区":
             out.append({"t": t, "type": "进入买点区", "level": "中", "msg": f'现价 {r["price"]} ≤ 买点 {r["buy"]}×1.05'})
         if abs(r["chg"]) >= 0.05:
+            w = _why(news, t)
             out.append({"t": t, "type": "大幅异动", "level": "高" if abs(r["chg"]) >= 0.08 else "中",
-                        "msg": f'单日 {r["chg"]*100:+.1f}%'})
+                        "msg": f'单日 {r["chg"]*100:+.1f}%' + (f' · 相关情报：{w["title"][:90]}' if w else ' · 48h 内无匹配情报（可能是板块/宏观驱动）'),
+                        "url": w["url"] if w else None})
         if r["from_hi"] >= -0.02:
             out.append({"t": t, "type": "逼近52周高点", "level": "低", "msg": f'距高点 {r["from_hi"]*100:.1f}%'})
         if r["price"] <= r["lo52"] * 1.03:

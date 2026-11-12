@@ -49,11 +49,63 @@ TOPICS = {
     "加密": r"\b(bitcoin|crypto|ethereum|stablecoin|coinbase)\b",
 }
 
-_TICKER_RE = {c["t"]: re.compile(r"(?<![A-Za-z])(\$?%s)(?![A-Za-z])" % re.escape(c["t"])) for c in config.WATCHLIST}
+_UNIV = list(config.WATCHLIST)
+
+
+def _ticker_re(t: str):
+    # 1~2 位代码（V、MA、T…）极易误匹配普通词（"V-shaped"），必须带 $ 才算；其余按独立单词匹配
+    return re.compile((r"(?<![A-Za-z])\$%s(?![A-Za-z])" if len(t) <= 2 else r"(?<![A-Za-z])(\$?%s)(?![A-Za-z$])") % re.escape(t))
+
+
+_TICKER_RE = {c["t"]: _ticker_re(c["t"]) for c in _UNIV}
 _ALIAS = {"LLY": "Lilly", "XOM": "Exxon", "GOOGL": "Google|Alphabet", "META": "Meta Platforms|Facebook", "V": "Visa",
           "TSM": "TSMC|Taiwan Semiconductor", "CRM": "Salesforce", "UNH": "UnitedHealth", "JPM": "JPMorgan|JP Morgan"}
 _NAME_RE = {c["t"]: re.compile(r"\b(%s)\b" % _ALIAS.get(c["t"], re.escape(c["name"].split()[0])), re.I)
-            for c in config.WATCHLIST if c["t"] in _ALIAS or len(c["name"].split()[0]) > 3}
+            for c in _UNIV if c["t"] in _ALIAS or len(c["name"].split()[0]) > 3}
+
+
+# 券商/投行几乎每天被当作“研报来源”引用（"JP Morgan raises target on X"）。此时它是信息来源，不是新闻主角，不应算作该股的新闻。
+_BROKER = {"JPM": r"JP ?Morgan(?: Chase)?", "GS": r"Goldman(?: Sachs)?", "MS": r"Morgan Stanley", "BAC": r"Bank of America|BofA",
+           "WFC": r"Wells Fargo", "C": r"Citi(?:group|bank)?", "BLK": r"BlackRock"}
+_SRC_VERB = re.compile(r"\b(names?|sees?|says?|upgrades?|downgrades?|initiates?|reiterates?|maintains?|favors?|recommends?|cautious|bullish|bearish|top picks?|(price )?targets?)\b"
+                       r"|\b(raises?|lifts?|hikes?|cuts?|lowers?)\b.{0,25}\b(targets?|estimates?|forecasts?|ratings?)\b", re.I)
+
+
+def _as_source(t: str, title: str) -> bool:
+    al = _BROKER.get(t)
+    if not al:
+        return False
+    for m in re.finditer(r"\b(?:%s)\b" % al, title, re.I):
+        tail, head = title[m.end():m.end() + 45], title[max(0, m.start() - 14):m.start()].lower()
+        if _SRC_VERB.search(tail) or re.search(r"(according to|per|from|via)\s*$", head):
+            return True
+    return False
+
+
+def _match_tickers(title: str) -> list[str]:
+    out = []
+    for t, rx in _TICKER_RE.items():
+        if (rx.search(title) or (t in _NAME_RE and _NAME_RE[t].search(title))) and not _as_source(t, title):
+            out.append(t)
+    return out
+
+
+def set_universe(wl: list[dict]) -> None:
+    """覆盖名单扩大后，重建 代码/名称 匹配表与按标的抓新闻的名单（build.py 在抓取前调用）。"""
+    global _UNIV, _TICKER_RE, _NAME_RE
+    _UNIV = list(wl)
+    _TICKER_RE = {c["t"]: _ticker_re(c["t"]) for c in _UNIV}
+    _NAME_RE = {c["t"]: re.compile(r"\b(%s)\b" % _ALIAS.get(c["t"], re.escape(c["name"].split()[0])), re.I)
+                for c in _UNIV if c["t"] in _ALIAS or len(c["name"].split()[0]) > 3}
+
+
+# 自动生成的低信息量稿件（机构持仓流水账、荐股导流、站点水文）：不是事件，不能当作涨跌的“原因”
+JUNK = re.compile(
+    r"\b(marketbeat|defense world|etf daily news|tickerreport|dailypolitical|the cerbat gem|wkrb news)\b"
+    r"|\b(stock|shares|position|stake|holdings?)\b.{0,40}\b(acquired|sold|bought|purchased|trimmed|boosted|lowered|raised|cut|added)\b.{0,12}\bby\b"
+    r"|\b(llc|l\.l\.c|advisors?|capital|management|wealth|partners|group|bancorp|trust|associates|financial|investments?|securities|company|corp|ltd|lp|mn)\b"
+    r".{0,40}\b(acquires?|sells?|buys?|purchases?|trims?|boosts?|lowers?|raises?|cuts?|adds?|takes?|opens?)\b.{0,12}\b(new )?(stake|position|shares)\b.{0,12}\bin\b",
+    re.I)
 
 
 def _any(pats, text): return any(re.search(p, text, re.I) for p in pats)
@@ -113,7 +165,7 @@ def fetch_feed(src: dict) -> list[dict]:
 
 def fetch_all_news(workers: int = 8) -> tuple[list[dict], dict]:
     jobs = list(config.NEWS_SOURCES) + [
-        {"name": "Google News · " + c["t"], "url": config.PER_TICKER_NEWS.format(q=c["t"])} for c in config.WATCHLIST]
+        {"name": "Google News · " + c["t"], "url": config.PER_TICKER_NEWS.format(q=c["t"])} for c in _UNIV]
     with ThreadPoolExecutor(workers) as ex:
         res = list(ex.map(fetch_feed, jobs))
     items, stat = [], {}
@@ -162,14 +214,17 @@ def score(it: dict, now: float | None = None) -> dict:
     if emotional: imp -= 10  # 情绪化无事实依据 -> 压分打灰
     bull, bear = len(re.findall(BULL, text, re.I)), len(re.findall(BEAR, text, re.I))
     sentiment = "利好" if bull > bear else "利空" if bear > bull else "中性"
-    tickers = [t for t, rx in _TICKER_RE.items() if rx.search(it["title"]) or (t in _NAME_RE and _NAME_RE[t].search(it["title"]))]
+    tickers = _match_tickers(it["title"])
     topics = [k for k, p in TOPICS.items() if re.search(p, text, re.I)] or ["其他"]
+    junk = bool(JUNK.search(it["title"]))
+    if junk:
+        imp -= 20          # 持仓流水账等自动稿件大幅降权
     imp = round(max(0, min(100, imp)), 1)
     grade = next(g for g, th, _ in config.GRADES if imp >= th)
     excluded = _any([rf"\b{k}\b" for k in config.EXCLUDE_KEYWORDS], text)
     return {**it, "strength": int(strength), "certain": int(certain), "novel": int(novel), "imp": imp,
             "grade": grade, "sentiment": sentiment, "tickers": tickers, "topics": topics,
-            "emotional": bool(emotional), "excluded": bool(excluded), "age_h": round(age_h, 1)}
+            "emotional": bool(emotional), "junk": junk, "excluded": bool(excluded), "age_h": round(age_h, 1)}
 
 
 def process(items: list[dict]) -> list[dict]:

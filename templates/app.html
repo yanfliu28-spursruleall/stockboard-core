@@ -15,7 +15,13 @@ main{flex:1;padding:18px 22px;min-width:0}h2{font-size:17px;margin-bottom:4px}.s
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid #1c2734;text-align:right;white-space:nowrap}
 th{color:var(--sub);font-weight:500;background:var(--panel2);position:sticky;top:0;cursor:pointer}td.l,th.l{text-align:left}td.w{white-space:normal;text-align:left;min-width:180px;max-width:300px;color:#c4d0dc;font-size:12.5px}
 .up{color:var(--up)}.dn{color:var(--down)}.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11.5px;border:1px solid var(--bd)}
-.z-买点区{background:#10301a;color:#6ee08a}.z-沉默区{background:#1c2734;color:var(--sub)}.z-高估区{background:#3a2e0d;color:#e6b43a}.z-卖点上方{background:#3a1512;color:#ff8a7e}
+.z-买点区{background:#10301a;color:#6ee08a}.z-沉默区{background:#1c2734;color:var(--sub)}.z-高估区{background:#3a2e0d;color:#e6b43a}.z-无估值,.z-无数据{background:#1c2734;color:var(--dim)}.z-存疑{background:transparent;border:1px dashed #5d6b7a;color:var(--sub)}
+.kvg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.kv{background:var(--panel2);border-radius:8px;padding:7px 10px}.kv span{display:block;color:var(--sub);font-size:11.5px}.kv b{font-size:15px;font-weight:600}
+.rbar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:6px 0}.rbar i{display:block}
+.tgt{position:relative;height:38px;margin:10px 4px 2px}.tgt .ln{position:absolute;top:19px;left:0;right:0;height:4px;background:#243040;border-radius:2px}.tgt .mk{position:absolute;top:10px;width:3px;height:22px;border-radius:2px}.tgt .lb{position:absolute;top:0;font-size:11px;color:var(--sub);white-space:nowrap}
+table.sens th,table.sens td{padding:6px 12px;font-size:12.5px;text-align:center;cursor:default}.mk-ok{background:#10301a}.mk-no{background:#3a1512}
+.mac .card b{font-size:17px}
+@media(max-width:800px){table.mt th,table.mt td{padding:8px 6px;font-size:12.5px}table.mt td.l{white-space:nowrap}}.z-卖点上方{background:#3a1512;color:#ff8a7e}
 .g{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:5px;font-weight:700;font-size:12px;color:#fff;margin-right:6px}
 .g-S{background:#e5484d}.g-A{background:#e8912d}.g-B{background:#3b82f6}.g-C{background:#5d6b7a}.g-D{background:#3a4654}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs button,.f select,.f input{background:var(--panel);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit}
@@ -52,7 +58,7 @@ button.go.wide{width:100%;height:38px;margin-top:8px}
  .fbar .tabs{width:100%}.tabs button{padding:8px 11px}
  input,select,textarea{font-size:16px}
  .ov .dr{width:100vw;padding:16px 14px calc(20px + env(safe-area-inset-bottom));border-left:0}.dr .x{right:12px;top:10px;font-size:22px;padding:6px 10px}
- .tall{display:none}.dt{display:none}.cl{display:block}
+ .tall{display:none}.dt{display:none}.cl{display:block}.hm{display:none}
  .warn{font-size:12px;padding:8px 10px}
  .dr table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
  #inv,#clrsel,.chip:has(#nsel){display:none}
@@ -94,10 +100,11 @@ const newsRow = n => `<div class="news"><span class="g g-${n.grade}">${n.grade}<
 const CW = () => Math.max(300, Math.min(760, document.documentElement.clientWidth - (document.documentElement.clientWidth <= 800 ? 40 : 330)));
 const V = {};
 V.overview = () => { const b=D.board.filter(r=>r.price), z=k=>b.filter(r=>r.zone===k).length;
-  return `<h2>平台总览</h2><div class="sub">研究面板 · 信息跟踪 · 最近重点情报</div>${banner}
+  return `<h2>平台总览</h2><div class="sub">研究面板 · 信息跟踪 · 最近重点情报</div>${banner}${macroPanel()}
   <div class="cards"><div class="card"><b>${D.board.length}</b><span>覆盖公司</span></div><div class="card"><b style="color:var(--down)">${D.alerts.filter(a=>a.level==='高').length}</b><span>高级预警</span></div>
   <div class="card"><b>${D.news.length}</b><span>情报总量</span></div><div class="card"><b style="color:var(--up)">${z('买点区')}</b><span>买点区</span></div>
-  <div class="card"><b>${z('卖点上方')}</b><span>卖点上方</span></div><div class="card"><b>${D.holdings.funds.length}</b><span>跟踪机构(13F)</span></div></div>
+  <div class="card"><b>${z('卖点上方')}</b><span>卖点上方</span></div><div class="card"><b style="color:var(--sub)">${z('存疑')}</b><span>存疑(低置信)</span></div><div class="card"><b>${D.holdings.funds.length}</b><span>跟踪机构(13F)</span></div></div>
+  ${calPanel()}
   <div class="box"><h3>预警日报 · ${D.alerts.length} 条</h3><div class="scroll" style="max-height:260px"><table>${D.alerts.slice(0,25).map(a=>`<tr><td class="l"><b>${a.t}</b></td><td class="l">${esc(a.type)}</td><td class="l">${esc(a.level)}</td><td class="l" style="white-space:normal">${esc(a.msg)}</td></tr>`).join('')||'<tr><td>暂无预警</td></tr>'}</table></div></div>
   <div class="box"><h3>最近重点情报（S/A 级）</h3>${D.news.filter(n=>['S','A'].includes(n.grade)&&!n.excluded).slice(0,8).map(newsRow).join('')||'<div class="news">暂无</div>'}</div>`; };
 
@@ -111,7 +118,7 @@ const blk=(x,kind,cls)=>{ const ai=x.ai, rule=items(x[kind],cls); if(!ai) return
 const estCell=(v,e,k)=>v==='—'?v:`${v}<div class="tag">${e[k]?e[k]+'E':''}${e.ccy&&e.ccy!=='USD'?' · '+e.ccy:''}</div>`;
 const ccyTag=e=>e&&e.ccy&&e.ccy!=='USD'?`<div class="tag">${e.ccy}</div>`:'';
 const gen=D.meta.generated, hh=gen.slice(11,16), dd=gen.slice(0,10);
-function filtered(){ let r=D.board.map(x=>({...x,zoneRank:ZR[x.zone]??4}));
+function filtered(){ let r=D.board.map(x=>({...x,zoneRank:ZR[x.zone]??4,mcap:(x.k||{}).mcap,earn_days:(x.next_earn||{}).days,rev30:(x.rv||{}).chg30}));
   r=r.filter(x=>(bs.f==='全部'||x.zone===bs.f)&&(!bs.sec||x.gics_sector===bs.sec)&&(!bs.ind||x.gics_industry===bs.ind)&&(!bs.alertOnly||(x.alerts||[]).length)&&(!bs.q||(x.t+x.name+x.sector).toLowerCase().includes(bs.q.toLowerCase())));
   return r.sort((a,b)=>((a[bs.k]??1e9)-(b[bs.k]??1e9))*(bs.asc?1:-1)); }
 V.board = () => { const secs=[...new Set(D.board.map(r=>r.gics_sector))].sort(), inds=[...new Set(D.board.filter(r=>!bs.sec||r.gics_sector===bs.sec).map(r=>r.gics_industry))].sort();
@@ -119,18 +126,18 @@ V.board = () => { const secs=[...new Set(D.board.map(r=>r.gics_sector))].sort(),
   return `<div class="chips"><span class="chip">更新 <b>${dd}</b></span><span class="chip">覆盖 <b>${D.board.length}</b> 家</span>
    <span class="chip hot">每日监控 ${hh} · 预警 <b>${na}</b> 新 <b>${D.meta.new_alerts??0}</b></span>
    <span class="chip">体检 ${dd.slice(5)} · 自动估值 <b>${h.auto??'—'}</b>/${h.total??'—'} 家 · 低置信 ${h.low_conf??'—'}</span></div>
-  ${banner}<div class="warn">估值 = 自身历史前瞻PE(中位)×GAAP口径一致预期EPS 与 DCF(一致预期增速) 的均值；买点/卖点带宽取自历史PE的P25/P75。一致预期来自 Yahoo 非官方接口，财报来自 SEC 10-K。无美国会计准则财报的公司仅以分析师目标价为中枢。悬停“估值来源”可看各方法结果。仅供研究参考，不构成投资建议。</div>
-  <div class="fbar"><div class="tabs" style="margin:0">${['全部','买点区','沉默区','高估区','卖点上方'].map(k=>`<button data-f="${k}" class="${bs.f===k?'on':''}">${k} <b>${cnt(k)}</b></button>`).join('')}</div>
+  ${banner}<div class="warn">估值 = 自身历史前瞻PE(中位)×GAAP口径一致预期EPS 与 DCF(一致预期增速) 的均值；买点/卖点带宽取自历史PE的P25/P75。一致预期来自 Yahoo 非官方接口，财报来自 SEC 10-K。无美国会计准则财报的公司仅以分析师目标价为中枢。悬停“估值来源”可看各方法结果。<b>置信度为「低」的估值不作买卖点判断，标为「存疑」</b>（保留模型原结论供参考）。仅供研究参考，不构成投资建议。</div>
+  <div class="fbar"><div class="tabs" style="margin:0">${['全部','买点区','沉默区','高估区','卖点上方',...['存疑','无估值'].filter(k=>cnt(k))].map(k=>`<button data-f="${k}" class="${bs.f===k?'on':''}">${k} <b>${cnt(k)}</b></button>`).join('')}</div>
    <select id="sec"><option value="">GICS 一级: 全部</option>${secs.map(s=>`<option ${bs.sec===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
    <select id="ind"><option value="">GICS 二级: 全部</option>${inds.map(s=>`<option ${bs.ind===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
    <input id="q" placeholder="搜索公司名 / 代码 / 行业" value="${esc(bs.q)}" style="min-width:200px"><button id="clr">清空筛选</button>
    <span style="flex:1"></span><span class="chip">已选 <b id="nsel">${bs.sel.size}</b></span><button id="inv">反选</button><button id="clrsel">清除</button>
    <button id="alr" class="${bs.alertOnly?'on':''}" style="border-color:var(--down);color:#ff8a7e">预警 <b>${D.board.filter(r=>(r.alerts||[]).length).length}</b></button><span class="sub" id="shown" style="margin:0"></span></div>
   <div class="box scroll tall"><table class="rich"><thead>
-   <tr class="grp"><th colspan="3">标的信息</th><th colspan="3">行业与地域</th><th colspan="2">股价 ($)</th><th colspan="3">三值 ($)</th><th colspan="2">现价位置</th><th colspan="2">结论</th><th colspan="3">核心内容（列内滚动看全文）</th><th>报告</th><th colspan="2">营收预测</th><th colspan="2">EPS预测</th></tr>
+   <tr class="grp"><th colspan="3">标的信息</th><th colspan="3">行业与地域</th><th colspan="2">股价 ($)</th><th colspan="3">三值 ($)</th><th colspan="2">现价位置</th><th colspan="2">结论</th><th colspan="3">市场与预期</th><th colspan="3">核心内容（列内滚动看全文）</th><th>报告</th><th colspan="2">营收预测</th><th colspan="2">EPS预测</th></tr>
    <tr><th><input type="checkbox" id="all"></th><th>#</th><th class="l">标的（公司/代码）</th><th class="l">GICS 一级</th><th class="l">GICS 二级</th><th class="l">总部</th>
    <th data-k="price">现价</th><th data-k="since_analysis" title="估值最近一次重算时的价格与日期">分析时价</th><th data-k="buy">参考买点</th><th data-k="fair">合理价</th><th data-k="sell">参考卖点</th>
-   <th data-k="to_buy">距买点</th><th data-k="to_fair">距合理价</th><th data-k="zoneRank">估值状态</th><th data-k="pe_pct" title="现价/GAAP预期EPS；括号为自身历史分位">前瞻PE(分位)</th>
+   <th data-k="to_buy">距买点</th><th data-k="to_fair">距合理价</th><th data-k="zoneRank">估值状态</th><th data-k="pe_pct" title="现价/GAAP预期EPS；括号为自身历史分位">前瞻PE(分位)</th><th data-k="mcap">市值</th><th data-k="earn_days" title="下次财报日；7 天内标红">财报日</th><th data-k="rev30" title="当年 EPS 一致预期的 30 日变动；↑↓ 为近 30 天上调/下调家数">预期修正</th>
    <th class="l">主要风险点</th><th class="l">主要增长点</th><th class="l">公司简介</th><th>详情</th><th title="各公司财年不同，单元格内小字为该公司自己的财年">当年E 营收</th><th>次年E 营收</th><th title="分析师一致预期，non-GAAP 口径">当年E EPS</th><th>次年E EPS</th></tr></thead><tbody id="tb"></tbody></table></div><div class="cl" id="cl"></div>`; };
 function rowsBoard(){ const r=filtered(); const e=r.find(x=>x.est&&x.est.fy0)?.est||{};
   return r.map((x,i)=>{ const es=x.est||{}, up=(x.alerts||[]).length;
@@ -140,18 +147,49 @@ function rowsBoard(){ const r=filtered(); const e=r.find(x=>x.est&&x.est.fy0)?.e
   <td class="l">${esc(x.gics_sector)}</td><td class="l">${esc(x.gics_industry)}</td><td class="l w" style="min-width:110px;font-size:12px">${esc(x.hq)}</td>
   <td><b>${x.price??'—'}</b><div>${spct(x.chg)}</div></td><td>${x.analysis_px??'—'}<div class="tag">${(x.analysis_date||'').slice(5)} · ${x.since_analysis==null?'':spct(x.since_analysis)}</div></td>
   <td class="hl">${f2(x.buy)}</td><td>${f2(x.fair)}</td><td>${f2(x.sell)}</td><td>${spct(x.to_buy)}</td><td>${spct(x.to_fair)}</td>
-  <td><span class="pill z-${x.zone}">${x.zone}</span><div class="tag" title="${esc(Object.entries(x.val_methods||{}).map(([k,v])=>k+': '+v).join(' | '))}">${esc((x.val_src||'').replace(/（.*$/,''))}<br>置信 ${x.val_conf||'—'}</div></td>
-  <td>${x.pe_now?x.pe_now+'<div class="tag">('+Math.round(x.pe_pct*100)+'%)</div>':'—'}</td>
+  <td><span class="pill z-${x.zone}">${x.zone}</span>${x.zone==='存疑'?`<div class="tag">模型：${x.zone_raw}</div>`:''}<div class="tag" title="${esc(Object.entries(x.val_methods||{}).map(([k,v])=>k+': '+v).join(' | '))}">${esc((x.val_src||'').replace(/（.*$/,''))}<br>置信 ${x.val_conf||'—'}</div></td>
+  <td>${x.pe_now?x.pe_now+'<div class="tag">('+Math.round(x.pe_pct*100)+'%)</div>':'—'}</td><td>${fB((x.k||{}).mcap)}</td><td>${earnCell(x)}</td><td>${revCell(x)}</td>
   <td class="cell"><div class="sc">${blk(x,'risks','rk')}</div></td><td class="cell"><div class="sc">${blk(x,'growths','gr')}</div></td><td class="cell"><div class="sc">${intro}</div></td>
   <td><button class="go" data-t="${x.t}" title="打开详情报告">↗</button></td>
-  <td>${estCell(fB(es.rev0),es,'fy0')}</td><td>${estCell(fB(es.rev1),es,'fy1')}</td><td>${estCell(f2(es.eps0),es,'fy0')}</td><td>${estCell(f2(es.eps1),es,'fy1')}</td></tr>`; }).join('')||'<tr><td colspan="23" style="padding:30px;color:var(--dim)">无匹配</td></tr>'; }
+  <td>${estCell(fB(es.rev0),es,'fy0')}</td><td>${estCell(fB(es.rev1),es,'fy1')}</td><td>${estCell(f2(es.eps0),es,'fy0')}</td><td>${estCell(f2(es.eps1),es,'fy1')}</td></tr>`; }).join('')||'<tr><td colspan="26" style="padding:30px;color:var(--dim)">无匹配</td></tr>'; }
 function cardsBoard(){ return filtered().map(x=>{ const up=(x.alerts||[]).length;
   return `<div class="bc"><div class="bh"><div><b style="font-size:15px">${esc(x.name)}</b> <span class="tag">${x.t}</span>${up?` <span class="dn tag">预警${up}</span>`:''}<div class="tag">${esc(x.gics_sector)} · ${esc(x.gics_industry)}</div></div>
   <div style="text-align:right"><b style="font-size:18px">${x.price??'—'}</b><div>${spct(x.chg)}</div></div></div>
-  <div class="bz"><span class="pill z-${x.zone}">${x.zone}</span><span class="tag">置信 ${x.val_conf||'—'}</span>${x.pe_now?`<span class="tag">前瞻PE ${x.pe_now}（历史${Math.round(x.pe_pct*100)}%分位）</span>`:''}</div>
+  <div class="bz"><span class="pill z-${x.zone}">${x.zone}</span>${x.zone==='存疑'?`<span class="tag">模型：${x.zone_raw}</span>`:''}<span class="tag">置信 ${x.val_conf||'—'}</span>${x.pe_now?`<span class="tag">前瞻PE ${x.pe_now}（历史${Math.round(x.pe_pct*100)}%分位）</span>`:''}${chipsPro(x)}</div>
   <div class="b3"><div><span>参考买点</span><b class="hl">${f2(x.buy)}</b><em>${spct(x.to_buy)}</em></div><div><span>合理价</span><b>${f2(x.fair)}</b><em>${spct(x.to_fair)}</em></div><div><span>参考卖点</span><b>${f2(x.sell)}</b><em>${spct(x.to_sell)}</em></div></div>
   <details><summary>风险 / 增长 / 简介</summary><div class="sc2">${blk(x,'risks','rk')}${blk(x,'growths','gr')}<div class="it">${esc(x.intro)}</div></div></details>
   <button class="go wide" data-t="${x.t}">打开详情报告 ↗</button></div>`; }).join('')||'<div class="sub" style="padding:20px">无匹配</div>'; }
+
+/* ===== 资深分析师视角：新增面板 ===== */
+const earnCell=x=>{const n=x.next_earn; return n?`<span class="${n.days<=7?'dn':''}">${n.date.slice(5)}</span><div class="tag">${n.days}天后</div>`:'—';};
+const revCell=x=>{const r=x.rv||{}; if(r.chg30==null) return '—'; return `${spct(r.chg30)}<div class="tag">↑${r.up30??0} ↓${r.dn30??0}</div>`;};
+const chipsPro=x=>{let s=''; const n=x.next_earn, r=x.rv||{}; if(n) s+=`<span class="tag">财报 ${n.date.slice(5)}（${n.days}天）</span>`; if(r.chg30!=null) s+=`<span class="tag">预期30日 ${spct(r.chg30)}</span>`; return s;};
+function proPanel(x){ const k=x.k||{}, rt=x.rt||{}, rv=x.rv||{}, bt=x.bt||[], ne=x.next_earn, ev=x.ev||{}, P1=v=>v==null?'—':(v*100).toFixed(1)+'%', N1=(v,d=1)=>v==null?'—':Number(v).toFixed(d);
+  const kv=(a,b,tip)=>`<div class="kv"${tip?` title="${tip}"`:''}><span>${a}</span><b>${b}</b></div>`;
+  let rd=''; if(x.g_implied!=null||x.sens){ const gi=x.g_implied, gc=x.val_g, S=x.sens;
+    const verdict=gi==null||gc==null?'':(gi>gc+0.03?'<span class="dn">价格已计入比预期更乐观的增长，容错空间小</span>':gi<gc-0.03?'<span class="up">价格隐含增速低于预期，存在安全边际</span>':'价格隐含增速与预期基本一致');
+    const tbl=S?`<table class="sens"><tr><th>折现率＼5年增速</th>${S.g.map(g=>`<th>${(g*100).toFixed(0)}%</th>`).join('')}</tr>${S.v.map((row,i)=>`<tr><th>${(S.r[i]*100).toFixed(0)}%</th>${row.map(v=>`<td class="${v>=x.price?'mk-ok':'mk-no'}">$${v.toFixed(0)}</td>`).join('')}</tr>`).join('')}</table><div class="tag" style="margin-top:4px">DCF 每股价值：绿=高于现价，红=低于现价。增速为一致预期 ±5pp，折现率 ±1pp，永续增速 3%。单点估值没有说服力，看这张表的区间。</div>`:'';
+    rd=`<h3>市场隐含预期（反向 DCF）与敏感性</h3><div class="it" style="padding:4px 0">现价 $${x.price} 隐含未来 5 年每股自由现金流年增速 <b>${gi==null?'—':(gi*100).toFixed(0)+'%'}</b>，一致预期 <b>${gc==null?'—':(gc*100).toFixed(0)+'%'}</b> —— ${verdict}</div>${tbl}`; }
+  const km=[['市值',fB(k.mcap)],['前瞻PE(雅虎)',k.fpe?N1(k.fpe):'—'],['PEG',N1(k.peg,2)],['EV/EBITDA',k.ev_ebitda?N1(k.ev_ebitda):'—'],['市净率',k.pb?N1(k.pb):'—'],['股息率',P1(k.div)],['Beta(1年,自算)',N1(x.beta1y,2)],['年化波动(1年)',P1(x.vol)],['1年最大回撤',P1(x.mdd)],
+    ['ROE',P1(k.roe)],['净利率',P1(k.pm)],['营业利润率',P1(k.om)],['净负债/EBITDA',x.nd_ebitda==null?'—':x.nd_ebitda+'x'],['做空/流通股',P1(k.short)],['机构持股',P1(k.inst)],['内部人持股',P1(k.insider)]].map(a=>kv(a[0],a[1])).join('');
+  let sell=''; if(rt.n){ const tot=(rt.sb||0)+(rt.b||0)+(rt.h||0)+(rt.s||0)+(rt.ss||0)||1, seg=(v,c)=>v?`<i style="width:${v/tot*100}%;background:${c}" title="${v}"></i>`:'', lo=rt.tlo, hi=rt.thi, pos=v=>Math.max(0,Math.min(100,(v-lo)/(hi-lo+1e-9)*100));
+    sell=`<h3>卖方观点</h3><div class="it" style="padding:2px 0">评级均值 <b>${N1(rt.mean,2)}</b>（1=强烈买入，5=强烈卖出）· ${rt.n} 位分析师 · 强买 ${rt.sb||0} / 买 ${rt.b||0} / 持有 ${rt.h||0} / 卖 ${(rt.s||0)+(rt.ss||0)}</div><div class="rbar">${seg(rt.sb,'#1f8a3b')}${seg(rt.b,'#3fb950')}${seg(rt.h,'#8a9aab')}${seg(rt.s,'#ff8a7e')}${seg(rt.ss,'#e5484d')}</div>
+    ${lo&&hi?`<div class="tgt"><div class="ln"></div><span class="lb" style="left:0">$${lo.toFixed(0)}</span><span class="lb" style="right:0">$${hi.toFixed(0)}</span>${rt.tmed?`<div class="mk" style="left:${pos(rt.tmed)}%;background:#d6a01c"></div>`:''}<div class="mk" style="left:${pos(x.price)}%;background:#5cb8f7"></div></div><div class="tag">目标价区间（黄=中位 $${N1(rt.tmed,0)}，蓝=现价 $${x.price}）${x.price<lo?'；现价低于最低目标价':x.price>hi?'；现价高于最高目标价':''}</div>`:''}`; }
+  const sp=bt.filter(b=>b.sp!=null);
+  let evh=`<h3>预期修正与财报</h3><div class="kvg">${kv('当年EPS预期',N1(rv.cur,2))}${kv('30日前',N1(rv.d30,2))}${kv('90日前',N1(rv.d90,2))}${kv('30日变动',rv.chg30==null?'—':spct(rv.chg30))}${kv('30日上调/下调',`${rv.up30??'—'} / ${rv.dn30??'—'}`)}${kv('下次财报',ne?`${ne.date}（${ne.days}天后）`:'—')}${kv('本季EPS预期',N1(ev.q_eps,2))}${kv('本季营收预期',fB(ev.q_rev))}</div>`;
+  if(sp.length) evh+=`<div style="margin-top:8px">${sp.map(b=>`<span class="pill" style="margin-right:6px" title="实际 ${b.act} vs 预期 ${N1(b.est,2)}">${(b.q||'').slice(0,7)} ${spct(b.sp)}</span>`).join('')}<span class="tag">最近 ${sp.length} 个季度 EPS 相对一致预期</span></div>`;
+  return `${rd}<h3>关键指标</h3><div class="kvg">${km}</div>${sell}${evh}`; }
+function macroPanel(){ const m=D.macro; if(!m) return ''; const rg=m.regime, br=m.breadth, c=rg.score>=4?'var(--up)':rg.score<=0?'var(--down)':'var(--amb)';
+  const row=i=>i.sym==='^TNX'?`<tr><td class="l"><b>${esc(i.name)}</b></td><td>${Number(i.last).toFixed(2)}%</td><td>—</td><td class="hm">—</td><td>${i.bp1m==null?'—':(i.bp1m>0?'+':'')+i.bp1m+'bp'}</td><td class="hm">—</td><td>—</td></tr>`
+    :`<tr><td class="l"><b>${esc(i.name)}</b></td><td>${i.last}</td><td>${spct(i.d1)}</td><td class="hm">${spct(i.w1)}</td><td>${spct(i.m1)}</td><td class="hm">${spct(i.ytd)}</td><td>${spct(i.vs200)}</td></tr>`;
+  const card=(v,l)=>`<div class="card"><b>${v}</b><span>${l}</span></div>`;
+  return `<div class="box" style="padding:12px 16px"><h3 style="padding:0 0 8px;border:0">市场环境 · 个股估值的参照系</h3>
+  <div style="margin-bottom:8px"><span class="pill" style="border-color:${c};color:${c};font-size:13px">${esc(rg.label)}（${rg.score}）</span> <span class="tag" style="white-space:normal">${rg.why.map(esc).join(' · ')}</span></div>
+  ${br?`<div class="cards mac" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin:8px 0">${card((br.above200*100).toFixed(0)+'%','股票在200日线上')}${card((br.above50*100).toFixed(0)+'%','股票在50日线上')}${card(br.new_high+' / '+br.new_low,'52周新高 / 新低')}${m.rsp_vs_spx_3m==null?'':card(spct(m.rsp_vs_spx_3m),'等权相对市值加权(3月)')}</div>`:''}
+  <div class="scroll" style="max-height:none"><table class="mt"><thead><tr><th class="l">品种</th><th>最新</th><th>1日</th><th class="hm">5日</th><th>1月</th><th class="hm">年初至今</th><th>距200日线</th></tr></thead><tbody>${m.items.map(row).join('')}</tbody></table></div>
+  <div class="tag" style="margin-top:6px">宽度样本 ${br?br.n:'—'} 只大中型股（${br?br.asof:''}）；风险偏好=指数趋势+VIX+宽度+信用比价的简单计分，只作环境参照，不是择时信号。</div></div>`; }
+function calPanel(){ const c=D.calendar||[]; if(!c.length) return ''; return `<div class="box"><h3>未来 30 天财报日历（覆盖名单内 ${c.length} 家）</h3><div class="scroll" style="max-height:300px"><table><thead><tr><th class="l">日期</th><th class="l">公司</th><th>天数</th><th>本季EPS预期</th><th>估值状态</th></tr></thead><tbody>${c.map(e=>`<tr><td class="l">${e.date.slice(5)}</td><td class="l"><b>${e.t}</b> <span class="tag hm">${esc(e.name)}</span></td><td class="${e.days<=7?'dn':''}">${e.days}</td><td>${f2(e.eps_q)}</td><td><span class="pill z-${e.zone}">${e.zone}</span></td></tr>`).join('')}</tbody></table></div></div>`; }
+
 function openDetail(t){ const x=D.board.find(r=>r.t===t); if(!x) return; const m=x.val_methods||{};
   const w=document.createElement('div'); w.className='ov'; w.onclick=e=>{if(e.target===w)w.remove()};
   w.innerHTML=`<div class="dr"><button class="x" onclick="this.closest('.ov').remove()">✕</button>
@@ -159,16 +197,16 @@ function openDetail(t){ const x=D.board.find(r=>r.t===t); if(!x) return; const m
   <div class="sub">${esc(x.hq)} · 市值 ${fB(x.mcap)} · 现价 ${x.price} · 分析时价 ${x.analysis_px}（${x.analysis_date}）· 估值来源 ${esc(x.val_src||'')} · 置信 ${x.val_conf||'—'}</div>
   <div class="cards"><div class="card"><b>${f2(x.buy)}</b><span>参考买点</span></div><div class="card"><b>${f2(x.fair)}</b><span>合理价</span></div><div class="card"><b>${f2(x.sell)}</b><span>参考卖点</span></div>
    <div class="card"><b>${x.pe_now??'—'}</b><span>前瞻PE · ${x.pe_pct!=null?Math.round(x.pe_pct*100)+'%分位':''}</span></div><div class="card"><b>${x.pe_band?x.pe_band.join(' / '):'—'}</b><span>历史PE P25/P50/P75</span></div></div>
-  ${bigChart(x)}<div class="two"><div><h3>风险点</h3>${blk(x,'risks','rk')}</div><div><h3>增长点</h3>${blk(x,'growths','gr')}</div></div>
+  ${bigChart(x)}${proPanel(x)}<div class="two"><div><h3>风险点</h3>${blk(x,'risks','rk')}</div><div><h3>增长点</h3>${blk(x,'growths','gr')}</div></div>
   <h3>估值拆解</h3><table>${Object.entries(m).map(([k,v])=>`<tr><td class="l">${esc(k)}</td><td>${v}</td></tr>`).join('')||'<tr><td>—</td></tr>'}</table>
   <h3>机构持仓（13F，滞后约45天）</h3><table>${(x.holders||[]).map(h=>`<tr><td class="l">${esc(h.fund)}</td><td>${esc(h.type)}</td><td>${pct(h.pct)}</td><td>${h.act}</td><td>${h.chg==null?'—':spct(h.chg)}</td><td>${h.period}</td></tr>`).join('')||'<tr><td class="l">所跟踪的 13F 机构均未进入前列持仓</td></tr>'}</table>
   <h3>近期情报</h3>${(x.news||[]).map(n=>`<div class="news"><span class="g g-${n.grade}">${n.grade}</span><span class="pill">${n.sentiment}</span> <a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a><div class="m">${esc(n.sources.join('/'))} · ${fmtT(n.ts)}</div></div>`).join('')||'<div class="news">暂无命中情报</div>'}
   <h3>公司简介</h3><div class="it">${esc(x.intro)}</div><div class="it" style="color:var(--sub)">${esc(x.summary_en||'')}</div></div>`;
   document.body.appendChild(w); }
-function bigChart(x){ const a=x.spark; if(!a||a.length<2) return ''; const W=CW(),Hh=150,all=[...a,x.buy,x.fair,x.sell], mn=Math.min(...all),mx=Math.max(...all), Y=v=>(Hh-8-(v-mn)/(mx-mn+1e-9)*(Hh-32)).toFixed(1);
+function bigChart(x){ const a=x.spark; if(!a||a.length<2) return ''; const W=CW(),Hh=150,all=[...a,...[x.buy,x.fair,x.sell].filter(v=>v!=null)], mn=Math.min(...all),mx=Math.max(...all), Y=v=>(Hh-8-(v-mn)/(mx-mn+1e-9)*(Hh-32)).toFixed(1);
   const pts=a.map((v,i)=>`${(i/(a.length-1)*W).toFixed(1)},${Y(v)}`).join(' ');
   const L=(v,c,t)=>`<line x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="${c}" stroke-dasharray="4 4"/><text x="${W-4}" y="${Y(v)-3}" fill="${c}" font-size="11" text-anchor="end">${t} ${v}</text>`;
-  return `<svg viewBox="0 0 ${W} ${Hh}" style="width:100%;background:#0f151c;border:1px solid var(--bd);border-radius:8px;margin:10px 0"><polyline fill="none" stroke="#5cb8f7" stroke-width="1.8" points="${pts}"/>${L(x.buy,'#3fb950','买点')}${L(x.fair,'#d6a01c','合理价')}${L(x.sell,'#ff6b5e','卖点')}</svg><div class="tag">近 60 个交易日收盘价与三值</div>`; }
+  return `<svg viewBox="0 0 ${W} ${Hh}" style="width:100%;background:#0f151c;border:1px solid var(--bd);border-radius:8px;margin:10px 0"><polyline fill="none" stroke="#5cb8f7" stroke-width="1.8" points="${pts}"/>${x.buy!=null?L(x.buy,'#3fb950','买点')+L(x.fair,'#d6a01c','合理价')+L(x.sell,'#ff6b5e','卖点'):''}</svg><div class="tag">近 60 个交易日收盘价与三值</div>`; }
 
 V.inst = () => { const H=D.holdings, ov=H.overlap||[], fs=H.funds||[];   /*inst*/
   const ovTable=`<div class="box scroll dt"><h3>多家机构共同持有</h3><table><thead><tr><th class="l">标的</th><th>持有机构数</th><th>合计市值</th><th>本期加仓/新进家数</th><th class="l">机构</th></tr></thead><tbody>${ov.map(o=>`<tr><td class="l"><b>${esc(o.issuer)}</b></td><td>${o.n}</td><td>$${money(o.value)}</td><td>${o.adds}</td><td class="l" style="white-space:normal;min-width:260px">${esc(o.funds.join('、'))}</td></tr>`).join('')||'<tr><td>暂无</td></tr>'}</tbody></table></div>`;

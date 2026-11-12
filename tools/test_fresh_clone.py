@@ -22,6 +22,11 @@ try:
     print("\n".join((r.stdout or "").strip().splitlines()[-2:]))
     if r.returncode:
         print((r.stderr or "")[-600:])
+    for tname in ("test_junk.py", "test_broker.py"):                      # 仓库自带的单测，在干净克隆里也应通过
+        if (repo / "tools" / tname).exists():
+            tr = subprocess.run([sys.executable, str(repo / "tools" / tname)], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            last = ((tr.stdout or "").strip().splitlines() or ["(无输出)"])[-1]
+            print(f"单测 {tname}: 退出码 {tr.returncode} | {last}")
     out = repo / "dist" / "index.html"
     if out.exists():
         h = out.read_text("utf-8")

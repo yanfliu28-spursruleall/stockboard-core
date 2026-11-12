@@ -3,11 +3,13 @@
 from __future__ import annotations
 import json
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import config
 from core import research_llm
 
+ET = ZoneInfo("America/New_York")
 CACHE = Path(__file__).resolve().parent.parent / "cache"
 
 SECTOR_CN = {"Technology": "信息技术", "Communication Services": "通信服务", "Consumer Cyclical": "可选消费", "Consumer Defensive": "必选消费",
@@ -99,6 +101,27 @@ def _risks(r: dict, news: list[dict], holders: list[dict]) -> list[dict]:
     bad = [n for n in news if n["sentiment"] == "利空" and n["grade"] in ("S", "A", "B")][:2]
     for n in bad:
         out.append(("近期利空", f"[{n['grade']}级] {n['title'][:110]}（{'/'.join(n['sources'][:2])}）"))
+    rv, kk, ins = r.get("rv") or {}, r.get("k") or {}, r.get("ins") or {}
+    gi, gc = r.get("g_implied"), r.get("val_g")
+    if rv.get("chg30") is not None and (rv["chg30"] < -0.02 or ((rv.get("dn30") or 0) >= 3 and (rv.get("dn30") or 0) > (rv.get("up30") or 0))):
+        c90 = f"，90 日 {rv['chg90']*100:+.1f}%" if rv.get("chg90") is not None else ""
+        out.append(("预期下修", f"当年 EPS 一致预期 30 日变动 {rv['chg30']*100:+.1f}%（上调 {rv.get('up30') or 0} 家 / 下调 {rv.get('dn30') or 0} 家）{c90}。预期下行期间股价通常承压，宜等修正方向转正再提高仓位。"))
+    if kk.get("short") and kk["short"] > 0.05:
+        out.append(("空头拥挤", f"做空占流通股 {kk['short']*100:.1f}%，多空分歧大；逼空与踩踏式下杀的波动都会被放大。"))
+    ne = r.get("next_earn")
+    if ne and ne["days"] <= 10:
+        out.append(("事件风险", f"下次财报 {ne['date']}（{ne['days']} 天后）。财报前后波动通常明显放大，仓位与止损应在财报前就定好，而不是事后补。"))
+    if r.get("nd_ebitda") is not None and r["nd_ebitda"] > 3:
+        out.append(("净负债偏高", f"净负债/EBITDA {r['nd_ebitda']:.1f}x，利率高位时利息覆盖与再融资是主要变量。"))
+    if gi is not None and gc is not None and gi > gc + 0.03:
+        out.append(("反向DCF", f"当前价格隐含未来 5 年每股自由现金流年增速约 {gi*100:.0f}%，高于一致预期的 {gc*100:.0f}%：价格已计入比预期更乐观的增长，容错空间小。"))
+    bt = [b["sp"] for b in (r.get("bt") or []) if b.get("sp") is not None]
+    if len(bt) >= 4 and sum(1 for x in bt if x < 0) >= 2:
+        out.append(("财报质量", f"最近 {len(bt)} 个季度有 {sum(1 for x in bt if x < 0)} 次 EPS 低于一致预期（平均 {sum(bt)/len(bt)*100:+.1f}%），盈利兑现度一般。"))
+    if (ins.get("sell") or 0) >= 6 and (ins.get("sell") or 0) >= 2 * (ins.get("buy") or 0) and (ins.get("net") or 0) < 0:
+        out.append(("内部人卖出", f"近 6 个月内部人交易 买 {ins.get('buy') or 0} 笔 / 卖 {ins['sell']} 笔，净持股变动 {(ins.get('net') or 0)*100:+.2f}%（净卖出）。期权行权与计划性减持（10b5-1）也会产生卖出，需结合披露判断。"))
+    if r.get("policy"):
+        out.append(("方法局限", r["policy"]))
     tr = [h for h in holders if h["act"] in ("减仓", "清仓")]
     if tr:
         out.append(("机构减持", "；".join(f"{h['fund']} {h['act']}" + (f" {h['chg']*100:+.0f}%" if h["chg"] not in (None,) else "") for h in tr[:3]) + "（13F，披露滞后约 45 天）"))
@@ -138,6 +161,22 @@ def _growth(r: dict, news: list[dict], holders: list[dict]) -> list[dict]:
     good = [n for n in news if n["sentiment"] == "利好" and n["grade"] in ("S", "A", "B")][:2]
     for n in good:
         out.append(("近期催化", f"[{n['grade']}级] {n['title'][:110]}（{'/'.join(n['sources'][:2])}）"))
+    rv, ins, rt = r.get("rv") or {}, r.get("ins") or {}, r.get("rt") or {}
+    gi, gc = r.get("g_implied"), r.get("val_g")
+    if rv.get("chg30") is not None and (rv["chg30"] > 0.02 or ((rv.get("up30") or 0) >= 3 and (rv.get("up30") or 0) > (rv.get("dn30") or 0))):
+        c90 = f"，90 日 {rv['chg90']*100:+.1f}%" if rv.get("chg90") is not None else ""
+        out.append(("预期上修", f"当年 EPS 一致预期 30 日变动 {rv['chg30']*100:+.1f}%（上调 {rv.get('up30') or 0} 家 / 下调 {rv.get('dn30') or 0} 家）{c90}。预期上修是股价最稳定的短期驱动之一。"))
+    if gi is not None and gc is not None and gi < gc - 0.03:
+        out.append(("反向DCF", f"当前价格仅隐含未来 5 年每股自由现金流年增速约 {gi*100:.0f}%，低于一致预期的 {gc*100:.0f}%：只要增长兑现，价格有被低估的空间（模型对 FCF 口径敏感，需自行核对）。"))
+    bt = [b["sp"] for b in (r.get("bt") or []) if b.get("sp") is not None]
+    if len(bt) >= 4 and all(x > 0 for x in bt):
+        out.append(("超预期记录", f"最近 {len(bt)} 个季度 EPS 全部超出一致预期，平均 {sum(bt)/len(bt)*100:+.1f}%。"))
+    if rt.get("n") and rt.get("mean") is not None:
+        low = (rt.get("s") or 0) + (rt.get("ss") or 0)
+        out.append(("卖方共识", f"评级均值 {rt['mean']:.2f}（1=强烈买入 … 5=强烈卖出），强买 {rt.get('sb') or 0} / 买 {rt.get('b') or 0} / 持有 {rt.get('h') or 0} / 卖 {low}；"
+                                f"目标价区间 ${rt.get('tlo') or 0:.0f}–${rt.get('thi') or 0:.0f}（中位 ${rt.get('tmed') or 0:.0f}），共 {rt['n']} 位分析师。一致看多本身也是风险：缺少边际买盘。"))
+    if (ins.get("buy") or 0) >= 3 and (ins.get("buy") or 0) >= 2 * (ins.get("sell") or 0) and (ins.get("net") or 0) > 0:
+        out.append(("内部人买入", f"近 6 个月内部人交易 买 {ins['buy']} 笔 / 卖 {ins.get('sell') or 0} 笔，净持股变动 {(ins.get('net') or 0)*100:+.2f}%（净买入）。注意 Yahoo 的笔数含期权行权/授予，未必都是公开市场买入。"))
     add = [h for h in holders if h["act"] in ("加仓", "新进")]
     if add:
         out.append(("机构加仓", "；".join(f"{h['fund']} {h['act']}" + (f" {h['chg']*100:+.0f}%" if h["chg"] is not None else "") for h in add[:3]) + "（13F，披露滞后约 45 天）"))
@@ -157,14 +196,32 @@ def enrich(board: list[dict], news: list[dict], funds: list[dict], alerts: list[
     for r in board:
         cs = r.get("cs") or {}
         pf = cs.get("profile") or {}
+        # —— 专业数据：关键指标 / 预期修正 / 卖方评级 / 财报日 / 超预期 / 内部人
+        r["k"], r["rt"], r["bt"], r["ins"], r["ev"] = cs.get("k"), cs.get("rt"), cs.get("bt"), cs.get("ins"), cs.get("ev")
+        rv = dict(cs.get("rv") or {})
+        if rv.get("cur") and rv.get("d30"): rv["chg30"] = rv["cur"] / rv["d30"] - 1
+        if rv.get("cur") and rv.get("d90"): rv["chg90"] = rv["cur"] / rv["d90"] - 1
+        r["rv"] = rv
+        kk = cs.get("k") or {}
+        r["nd_ebitda"] = round((kk["debt"] - (kk.get("cash") or 0)) / kk["ebitda"], 2) if kk.get("ebitda") and kk["ebitda"] > 0 and kk.get("debt") is not None and r.get("sector_en") != "Financial Services" else None
+        r["next_earn"] = None
+        for ts in ((cs.get("ev") or {}).get("earn") or []):
+            d = datetime.fromtimestamp(ts, tz=ET).date()
+            if d >= date.today():
+                r["next_earn"] = {"date": d.isoformat(), "days": (d - date.today()).days}
+                break
         r["gics_sector"] = SECTOR_CN.get(pf.get("sector"), pf.get("sector") or "—")
         r["gics_industry"] = INDUSTRY_CN.get(pf.get("industry"), pf.get("industry") or r["sector"])
         r["hq"] = ", ".join(x for x in (pf.get("city"), pf.get("state"), pf.get("country")) if x) or "—"
         r["employees"], r["mcap"], r["website"], r["summary_en"] = pf.get("employees"), pf.get("mcap"), pf.get("website"), pf.get("summary")
         r["news"] = [{k: n[k] for k in ("title", "url", "grade", "sentiment", "imp", "sources", "ts")} for n in by_t.get(r["t"], [])[:8]]
         r["holders"] = holders_of(r["t"], funds)
-        r["risks"] = _risks(r, by_t.get(r["t"], []), r["holders"])
-        r["growths"] = _growth(r, by_t.get(r["t"], []), r["holders"])
+        try:
+            r["risks"] = _risks(r, by_t.get(r["t"], []), r["holders"])
+            r["growths"] = _growth(r, by_t.get(r["t"], []), r["holders"])
+        except Exception as e:     # 隔离：单只股票的数据缺失/异常只影响它自己，不能让整个定时刷新失败
+            print(f"      ⚠ {r['t']} 叙述生成失败（{type(e).__name__}: {str(e)[:60]}），该标的风险/增长要点留空")
+            r["risks"], r["growths"] = r.get("risks") or [], []
         r["est"] = {"fy0": cs.get("fy0"), "fy1": cs.get("fy1"), "rev0": cs.get("rev0"), "rev1": cs.get("rev1"),
                     "eps0": cs.get("eps0"), "eps1": cs.get("eps1"), "n": cs.get("n0"), "ccy": cs.get("ccy") or "USD"}
         r["alerts"] = [a for a in alerts if a["t"] == r["t"]]

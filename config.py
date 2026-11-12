@@ -13,9 +13,12 @@
 # ---------------------------------------------------------------------------
 # 观察名单与研究观点属于个人研究内容：放在 watchlist_local.py（不进仓库）；没有时回退到示例。
 try:
-    from watchlist_local import WATCHLIST
+    import watchlist_local as _wl
+    WATCHLIST = _wl.WATCHLIST
+    EXTRA_TICKERS = list(getattr(_wl, "EXTRA_TICKERS", []))     # 额外自动纳入的标的（无手写观点，自动估值）
 except ImportError:
     from watchlist_example import WATCHLIST
+    EXTRA_TICKERS = []
 
 # 行业 -> 代表 ETF（用于行业景气度：动量+相对强弱）
 SECTOR_ETFS = {

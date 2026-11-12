@@ -11,3 +11,6 @@ WATCHLIST = [
     {"t": "XOM", "name": "ExxonMobil", "sector": "能源", "etf": "XLE", "buy": 95, "fair": 120, "sell": 140,
      "risk": "（示例）", "growth": "（示例）", "intro": "综合能源巨头"},
 ]
+
+# 额外自动纳入的标的：只需给代码，名称/行业自动获取，估值自动计算（没有你的手写观点）。
+EXTRA_TICKERS = []
