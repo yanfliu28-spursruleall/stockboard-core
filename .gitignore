@@ -1,0 +1,20 @@
+# 以下内容含口令/缓存/个人数据，绝不能被提交或推送：
+secrets/
+cache/
+logs/
+status/
+dist/
+dist_new/
+dist_prev/
+__pycache__/
+*.pyc
+*.lock
+publish_hook.cmd
+watchlist_local.py
+# 一次性迁移/补丁脚本与备份，不属于项目源码
+tools/patch_*.py
+tools/board_new.js
+tools/quant_ui.js
+templates/*.bak
+templates/*.pre_mobile
+tools/test_hook.py
