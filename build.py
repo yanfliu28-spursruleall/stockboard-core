@@ -58,6 +58,7 @@ def main():
         else:
             print("[3/4] 13F ..."); hold = hmod.build_holdings()
             (CACHE / "holdings.json").write_text(json.dumps(hold, ensure_ascii=False), "utf-8")
+        hold["overlap"] = hmod.overlap(hold["funds"])    # 总是用机构明细重算“共同持有”（缓存里的旧统计可能有误）
         ok = sum(1 for v in hist.values() if v)
         print(f"      行情成功 {ok}/{len(hist)}，新闻原始 {len(raw)} 条，13F 机构 {len(hold['funds'])} 家")
         if ok == 0 and not raw:

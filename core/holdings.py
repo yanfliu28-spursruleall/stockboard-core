@@ -97,19 +97,30 @@ def fund_report(fund: dict) -> dict | None:
             "moves": [r for r in rows if r["act"] in ("新进", "加仓", "减仓", "清仓")][:30]}
 
 
+# ETF 家族的统称（如 "ISHARES TR" 下面是几十只不同的 ETF），13F 里同名但不是同一个标的，不能当作“共同持有”
+_FAMILY = re.compile(r"^(ISHARES (TR|INC|U S ETF TR)|VANGUARD (INDEX|SCOTTSDALE|WORLD|MALVERN) FDS|SELECT SECTOR SPDR TR|SPDR SER TR|"
+                     r"PROSHARES TR|INVESCO EXCHANGE TRADED FD TR|DIREXION SHS ETF TR|VANECK ETF TR(UST)?|ETF SER SOLUTIONS|ALPS ETF TR|GLOBAL X FDS)$")
+
+
 def overlap(reports: list[dict]) -> list[dict]:
-    """多家机构共同持有（对应 A 股版"三类资金共同重仓"）"""
-    m: dict[str, list] = {}
+    """多家机构共同持有（对应 A 股版"三类资金共同重仓"）。
+    按“机构”去重计数：同一家机构持有同一公司的多个股票类别（如 Alphabet A/C 类）只算 1 家，
+    否则会出现“11 家持有”而总共只跟踪 8 家机构的错误。"""
+    m: dict[str, dict[str, list]] = {}
     for r in reports:
         for t in r["top"][:25]:
-            key = re.sub(r"[^A-Z0-9]", "", t["issuer"].upper())[:14]
-            m.setdefault(key, []).append((r["fund"], t))
+            name = re.sub(r"\s+", " ", t["issuer"].upper().strip())
+            if _FAMILY.match(name):
+                continue
+            key = re.sub(r"[^A-Z0-9]", "", name)[:14]
+            m.setdefault(key, {}).setdefault(r["fund"], []).append(t)
     out = []
-    for k, v in m.items():
-        if len(v) >= 2:
-            out.append({"issuer": v[0][1]["issuer"], "funds": [f for f, _ in v], "n": len(v),
-                        "value": sum(t["value"] for _, t in v),
-                        "adds": sum(1 for _, t in v if t["act"] in ("新进", "加仓"))})
+    for by_fund in m.values():
+        if len(by_fund) >= 2:
+            rows = [t for ts in by_fund.values() for t in ts]
+            out.append({"issuer": rows[0]["issuer"], "funds": list(by_fund), "n": len(by_fund),
+                        "value": sum(t["value"] for t in rows),
+                        "adds": sum(1 for ts in by_fund.values() if any(t["act"] in ("新进", "加仓") for t in ts))})
     out.sort(key=lambda x: (-x["n"], -x["value"]))
     return out[:30]
 
